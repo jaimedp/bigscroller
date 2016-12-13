@@ -18,7 +18,8 @@ class InfList extends React.Component {
     this.state = {
       visibleStart: 0,
       visibleEnd: 0,
-      sizes: initSizes(props.children, -1)
+      sizes: initSizes(props.children, -1),
+      prefix: makePrefixArray(props.children, this.props.minRowHeight)
     };
 
     this.onScroll = this.onScroll.bind(this);
@@ -30,12 +31,17 @@ class InfList extends React.Component {
     this.shouldScroll = true;
   }
 
+  componentWillUpdate() {
+    this.scrollHeight = this._div.scrollHeight;
+    this.scrollTop = this._div.scrollTop;
+  }
+
   componentDidUpdate() {
     this.measureElements();
-    if (this.props.flip) {
+    // if (this.props.flip) {
       this.scrollIntoView();
-      // this.adjustScrollPos();
-    }
+      this.adjustScrollPos();
+    // }
   }
 
   componentWillReceiveProps(nextProps) {
@@ -73,10 +79,14 @@ class InfList extends React.Component {
 
   adjustScrollPos() {
     if (this.prevScrollHeight !== this._div.scrollHeight) {
-      const delta = this.prevScrollHeight - this._div.scrollHeight;
+      this._div.scrollTop = this.scrollTop + (this._div.scrollHeight - this.scrollHeight);
+    //   const delta = this._div.scrollHeight- this.prevScrollHeight;
       this.prevScrollHeight = this._div.scrollHeight;
       this.scrollAdjustment = true;
-      this._div.scrollTop -= delta;
+    //   this._div.scrollTop += delta;
+    //   console.log('adjusting pos by ', delta);
+
+      console.log('scroll adjusted')
     }
   }
 
@@ -97,24 +107,38 @@ class InfList extends React.Component {
     // debugger;
     const prefix = makePrefixArray(this.state.sizes, this.props.minRowHeight);
     const visibleHeight = this.clientHeight;
-    const top = this.currentScrollTop || this._div.scrollTop;
+    const top = this._div.scrollTop;
     const bottom = top + visibleHeight;
     const scrollHeight = this._div.scrollHeight;
 
     let lastRowIndex, lastRowPos;
     let firstIndex;
     let visibleRows;
-    if (this.props.flip) {
+    if (true || this.props.flip) {
       lastRowIndex = prefix.length - 1;
       if (scrollHeight > visibleHeight) {
         while (prefix[lastRowIndex] > top + visibleHeight) lastRowIndex--;
       }
 
+      lastRowIndex = Math.min(prefix.length - 1, lastRowIndex + 1);
+
       lastRowPos = prefix[lastRowIndex];
       firstIndex = lastRowIndex;
+      const bottomDelta = Math.max(0, lastRowPos - (top + visibleHeight));
+      const lastPartial = lastRowPos - bottomDelta;
 
-      while (lastRowPos - prefix[firstIndex - 1] < visibleHeight) firstIndex--;
-      visibleRows = lastRowIndex - firstIndex + 1;
+      let visibleCount = 0;
+      let curVisibleHeight = prefix[lastRowIndex] - prefix[lastRowIndex];
+
+      while (curVisibleHeight < visibleHeight) {
+        visibleCount++;
+        curVisibleHeight += (prefix[lastRowIndex] - prefix[lastRowIndex - visibleCount]);
+      }
+      // while (lastRowPos - prefix[firstIndex - 1] < visibleHeight) firstIndex--;
+      // while (bottomDelta + prefix[lastRowIndex] - prefix[firstIndex] < visibleHeight) firstIndex--;
+      // visibleRows = lastRowIndex - firstIndex + 1;
+      firstIndex = Math.max(0, lastRowIndex - visibleCount - 3);
+      visibleRows = visibleCount;
     } else {
       firstIndex = 0;
       while (prefix[firstIndex] < top) firstIndex++;
@@ -125,12 +149,13 @@ class InfList extends React.Component {
       lastRowPos = prefix[lastRowIndex];
     }
 
-    const firstRowPos = firstIndex ? prefix[firstIndex - 1] : 0
+    const firstRowPos = firstIndex ? prefix[firstIndex] : 0
 
     const buffer = 1;
     const totalHeight = prefix[prefix.length - 1];
-    const visibleStart = Math.max(0, firstIndex - 1);
-    const visibleEnd = Math.min(prefix.length, firstIndex + visibleRows + 1);
+
+    const visibleStart = Math.max(0, firstIndex);
+    const visibleEnd = Math.min(prefix.length, lastRowIndex + 1);
     const removedFromTop = firstRowPos;
     const removedFromBottom = totalHeight - lastRowPos;
 
@@ -139,9 +164,15 @@ class InfList extends React.Component {
       visibleRows: visibleRows,
       visibleStart: visibleStart,
       visibleEnd: visibleEnd,
+
+      displayStart: visibleStart, // Math.max(0, Math.floor(visibleStart - visibleRows * 1.5)),
+      displayEnd: visibleEnd, // Math.min(prefix.length, visibleEnd * 2),
+
       offsetTop: removedFromTop,
       offsetBottom: removedFromBottom,
-      totalHeight: totalHeight
+      totalHeight: totalHeight,
+      prefix: prefix,
+      clientHeight: scrollHeight
     });
   }
 
@@ -159,17 +190,17 @@ class InfList extends React.Component {
     this.currentScrollTop = this._div.scrollTop
     if (!this.scrollAdjustment) {
       window.requestAnimationFrame(() => this.computeVisibleItems());
+      // this.computeVisibleItems();
     } else {
       this.scrollAdjustment = false;
     }
-    // this.computeVisibleItems();
     // console.log(this._div.scrollTop);
   }
 
   render() {
     let visible = [];
 
-    for (let j=this.state.visibleStart; j<this.state.visibleEnd; j++) {
+    for (let j=this.state.displayStart; j<this.state.displayEnd; j++) {
       visible.push(<InfListItem index={j} key={j}>{this.props.children[j]}</InfListItem>);
     }
 
@@ -191,7 +222,6 @@ class InfList extends React.Component {
             <div className="spacer bottom"style={{height: this.state.offsetBottom}}></div>
           </div>
         </div>
-        {debugInfo}
         <button onClick={() => this._div.scrollTop--}>less</button>
         <button onClick={() => this._div.scrollTop++}>more</button>
       </div>
@@ -211,8 +241,8 @@ InfList.defaultProps = {
 
 class Main extends React.Component {
   render() {
-    const el = new Array(1000).fill(true).map((__, i) => {
-      const h = Math.random() * 100 + 25 + 'px';
+    const el = new Array(5000).fill(true).map((__, i) => {
+      const h = 50; //Math.random() * 100 + 25 + 'px';
       const style = {height: h, borderBottom: 'solid 1px red'};
       return <div style={style} key={i}>{i}</div>;
     });
@@ -220,7 +250,7 @@ class Main extends React.Component {
     const style = {
       marginTop: 0,
       overflow: 'auto',
-      height: 400,
+      height: 200,
       border: 'solid 1px blue',
       transform: 'translateZ(0)'
     };
