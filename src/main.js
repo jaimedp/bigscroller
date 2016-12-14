@@ -155,6 +155,7 @@ class InfList extends React.Component {
 
 
     const buffer = 1;
+    const overscan = this.props.overscan;
 
     const visibleStart = Math.max(0, firstIndex);
     const visibleEnd = Math.min(totalRows - 1, lastRowIndex);
@@ -163,9 +164,11 @@ class InfList extends React.Component {
     lastRowPos = prefix[lastRowIndex];
 
 
+    const displayStart = Math.max(0, Math.floor(visibleStart - overscan));
+    const displayEnd = Math.min(prefix.length - 1, visibleEnd + overscan);
 
-    const removedFromTop = firstRowPos;
-    const removedFromBottom = totalHeight - lastRowPos;
+    const removedFromTop = prefix[displayStart]; // firstRowPos;
+    const removedFromBottom = totalHeight - prefix[displayEnd]; //lastRowPos;
 
     this.setState({
       initialoffset: this._div.scrollTop,
@@ -173,8 +176,10 @@ class InfList extends React.Component {
       visibleStart: visibleStart,
       visibleEnd: visibleEnd,
 
-      displayStart: visibleStart, // Math.max(0, Math.floor(visibleStart - visibleRows * 1.5)),
-      displayEnd: visibleEnd, // Math.min(prefix.length, visibleEnd * 2),
+      // displayStart: visibleStart , // Math.max(0, Math.floor(visibleStart - visibleRows * 1.5)),
+      // displayEnd: visibleEnd, // Math.min(prefix.length, visibleEnd * 2),
+      displayStart: displayStart,
+      displayEnd: displayEnd,
 
       offsetTop: removedFromTop,
       offsetBottom: removedFromBottom,
@@ -247,13 +252,14 @@ InfList.propTypes = {
 
 InfList.defaultProps = {
   minRowHeight: 60,
+  overscan: 10,
   flip: true
 };
 
 class Main extends React.Component {
   render() {
     const el = new Array(500).fill(true).map((__, i) => {
-      const h = Math.random() * 100 + 25 + 'px';
+      const h = Math.floor(Math.random() * 100) + 25 + 'px';
       const style = {height: h, borderBottom: 'solid 1px red', backgroundColor: i % 2 === 0 ? 'red' : 'green'};
       return <div style={style} key={i}>{i}</div>;
     });
