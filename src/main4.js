@@ -14,6 +14,16 @@ class BigList {
     this.container.style.overflow = 'auto';
     this.el.appendChild(this.container);
     this.items = new Array(size).fill(true).map((e, i) => createItem(i)).reverse();
+
+    this.renderFirst = 0;
+    this.renderCount = 0;
+    this.visibleFirst = 0;
+    this.visibleCount = 0;
+  }
+
+  computeVisibleElements() {
+    const lastVisible = this.items.length - 1;
+
   }
 
   render() {

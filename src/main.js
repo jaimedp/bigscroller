@@ -11,6 +11,8 @@ const makePrefixArray = (arr, avg) => arr.reduce((prev, el, i) => {
   return prev;
 }, new Array(arr.length));
 
+const makeReversePrefix = (arr, avg) => makePrefixArray(arr.reverse(), avg);
+
 class InfList extends React.Component {
   constructor(props) {
     super(props);
@@ -70,11 +72,6 @@ class InfList extends React.Component {
       prev[s.index] = s.height;
       return prev;
     }, this.state.sizes);
-
-    this.clientHeight = this._div.clientHeight;
-
-
-    // this.setState({ itemHeightAvg: avg });
   }
 
   adjustScrollPos() {
@@ -105,41 +102,44 @@ class InfList extends React.Component {
     // console.log('avg', avg);
 
     // debugger;
-    const prefix = makePrefixArray(this.state.sizes, this.props.minRowHeight);
-    const visibleHeight = this.clientHeight;
-    const top = this._div.scrollTop;
-    const bottom = top + visibleHeight;
-    const scrollHeight = this._div.scrollHeight;
-
     let lastRowIndex, lastRowPos;
     let firstIndex;
+    let firstRowPos;
     let visibleRows;
+    let totalHeight;
+    let totalRows = this.state.sizes.length;
+    let scrollHeight;
+    const prefix = makePrefixArray(this.state.sizes, this.props.minRowHeight);
     if (true || this.props.flip) {
-      lastRowIndex = prefix.length - 1;
-      if (scrollHeight > visibleHeight) {
-        while (prefix[lastRowIndex] > top + visibleHeight) lastRowIndex--;
-      }
+      const reversePrefix = makeReversePrefix(this.state.sizes.slice(), this.props.minRowHeight);
 
-      lastRowIndex = Math.min(prefix.length - 1, lastRowIndex + 1);
+      const visibleHeight = this._div.clientHeight;
+      const top = this._div.scrollHeight - this._div.scrollTop - visibleHeight;
+      const bottom = top + visibleHeight;
 
-      lastRowPos = prefix[lastRowIndex];
-      firstIndex = lastRowIndex;
-      const bottomDelta = Math.max(0, lastRowPos - (top + visibleHeight));
-      const lastPartial = lastRowPos - bottomDelta;
+      firstIndex = 0;
+      lastRowIndex = 0; //totalRows - 1;
+      while (reversePrefix[firstIndex] < top) firstIndex++;
+      while (reversePrefix[lastRowIndex] < bottom) lastRowIndex++;
 
-      let visibleCount = 0;
-      let curVisibleHeight = prefix[lastRowIndex] - prefix[lastRowIndex];
+      const tmp = lastRowIndex;
+      lastRowIndex = Math.min(totalRows - firstIndex - 1, totalRows - 1);
+      firstIndex = Math.max(0, totalRows - tmp - 1);
 
-      while (curVisibleHeight < visibleHeight) {
-        visibleCount++;
-        curVisibleHeight += (prefix[lastRowIndex] - prefix[lastRowIndex - visibleCount]);
-      }
-      // while (lastRowPos - prefix[firstIndex - 1] < visibleHeight) firstIndex--;
-      // while (bottomDelta + prefix[lastRowIndex] - prefix[firstIndex] < visibleHeight) firstIndex--;
-      // visibleRows = lastRowIndex - firstIndex + 1;
-      firstIndex = Math.max(0, lastRowIndex - visibleCount - 3);
-      visibleRows = visibleCount;
+      totalHeight = prefix[prefix.length - 1];
+
+
+
+
+
+
+
     } else {
+      const visibleHeight = this._div.clientHeight; //this.clientHeight;
+      const top = this._div.scrollTop;
+      const bottom = top + visibleHeight;
+      scrollHeight = this._div.scrollHeight;
+
       firstIndex = 0;
       while (prefix[firstIndex] < top) firstIndex++;
 
@@ -147,15 +147,23 @@ class InfList extends React.Component {
       while (prefix[firstIndex + visibleRows] < top + visibleHeight) visibleRows++;
       lastRowIndex = Math.min(firstIndex + visibleRows, prefix.length-1);
       lastRowPos = prefix[lastRowIndex];
+
+      totalHeight = prefix[prefix.length - 1];
+      firstRowPos = firstIndex ? prefix[firstIndex] : 0
+
     }
 
-    const firstRowPos = firstIndex ? prefix[firstIndex] : 0
 
     const buffer = 1;
-    const totalHeight = prefix[prefix.length - 1];
 
     const visibleStart = Math.max(0, firstIndex);
-    const visibleEnd = Math.min(prefix.length, lastRowIndex + 1);
+    const visibleEnd = Math.min(totalRows - 1, lastRowIndex);
+
+    firstRowPos = firstIndex ? prefix[firstIndex] : 0
+    lastRowPos = prefix[lastRowIndex];
+
+
+
     const removedFromTop = firstRowPos;
     const removedFromBottom = totalHeight - lastRowPos;
 
@@ -171,7 +179,6 @@ class InfList extends React.Component {
       offsetTop: removedFromTop,
       offsetBottom: removedFromBottom,
       totalHeight: totalHeight,
-      prefix: prefix,
       clientHeight: scrollHeight
     });
   }
@@ -189,7 +196,10 @@ class InfList extends React.Component {
   onScroll(e) {
     this.currentScrollTop = this._div.scrollTop
     if (!this.scrollAdjustment) {
-      window.requestAnimationFrame(() => this.computeVisibleItems());
+      window.requestAnimationFrame(() => {
+        this.clientHeight = this._div.clientHeight;
+        this.computeVisibleItems();
+      });
       // this.computeVisibleItems();
     } else {
       this.scrollAdjustment = false;
@@ -200,7 +210,7 @@ class InfList extends React.Component {
   render() {
     let visible = [];
 
-    for (let j=this.state.displayStart; j<this.state.displayEnd; j++) {
+    for (let j=this.state.displayStart; j<=this.state.displayEnd; j++) {
       visible.push(<InfListItem index={j} key={j}>{this.props.children[j]}</InfListItem>);
     }
 
@@ -222,6 +232,7 @@ class InfList extends React.Component {
             <div className="spacer bottom"style={{height: this.state.offsetBottom}}></div>
           </div>
         </div>
+        {debugInfo}
         <button onClick={() => this._div.scrollTop--}>less</button>
         <button onClick={() => this._div.scrollTop++}>more</button>
       </div>
@@ -241,9 +252,9 @@ InfList.defaultProps = {
 
 class Main extends React.Component {
   render() {
-    const el = new Array(5000).fill(true).map((__, i) => {
-      const h = 50; //Math.random() * 100 + 25 + 'px';
-      const style = {height: h, borderBottom: 'solid 1px red'};
+    const el = new Array(500).fill(true).map((__, i) => {
+      const h = Math.random() * 100 + 25 + 'px';
+      const style = {height: h, borderBottom: 'solid 1px red', backgroundColor: i % 2 === 0 ? 'red' : 'green'};
       return <div style={style} key={i}>{i}</div>;
     });
 
